@@ -1,0 +1,1 @@
+internal sealed record EmbedRequest(string Text);

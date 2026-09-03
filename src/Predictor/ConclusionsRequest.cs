@@ -1,0 +1,1 @@
+internal sealed record ConclusionsRequest(string Context, string? Question);

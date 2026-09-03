@@ -1,0 +1,1 @@
+internal sealed record ChatRequest(string Message, string? SystemPrompt);
