@@ -3,7 +3,7 @@ using Microsoft.Extensions.Options;
 
 namespace Predictor.Predictions;
 
-internal sealed class PredictionStore
+public sealed class PredictionStore
 {
     private readonly string _root;
     private readonly string _failedRoot;

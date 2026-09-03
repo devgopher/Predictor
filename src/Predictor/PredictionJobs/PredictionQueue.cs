@@ -3,7 +3,7 @@ using System.Threading.Channels;
 
 namespace Predictor.Predictions;
 
-internal sealed class PredictionQueue
+public sealed class PredictionQueue
 {
     private readonly Channel<PredictionJob> _channel = Channel.CreateUnbounded<PredictionJob>(
         new UnboundedChannelOptions
@@ -45,7 +45,7 @@ internal sealed class PredictionQueue
     public void MarkCompleted(Guid requestId) => _inFlight.TryRemove(requestId, out _);
 }
 
-internal readonly record struct EnqueueAttempt(EnqueueStatus Status, string? Error)
+public readonly record struct EnqueueAttempt(EnqueueStatus Status, string? Error)
 {
     public static EnqueueAttempt Accepted() => new(EnqueueStatus.Accepted, null);
 
@@ -54,7 +54,7 @@ internal readonly record struct EnqueueAttempt(EnqueueStatus Status, string? Err
     public static EnqueueAttempt Failed(string error) => new(EnqueueStatus.Failed, error);
 }
 
-internal enum EnqueueStatus
+public enum EnqueueStatus
 {
     Accepted,
     Duplicate,

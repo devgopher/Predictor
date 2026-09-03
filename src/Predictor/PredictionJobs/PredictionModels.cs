@@ -4,13 +4,11 @@ using System.Text.Json.Serialization;
 
 namespace Predictor.Predictions;
 
-internal sealed record EnqueuePredictionRequest(string? RequestId, string? Text);
+public sealed record PredictionJob(Guid RequestId, string Text);
 
-internal sealed record PredictionJob(Guid RequestId, string Text);
+public sealed record PredictionResult(Guid RequestId, DateTimeOffset CreatedAt, string Text);
 
-internal sealed record PredictionResult(Guid RequestId, DateTimeOffset CreatedAt, string Text);
-
-internal sealed record FailedPrediction(Guid RequestId, DateTimeOffset CreatedAt, string Error);
+public sealed record FailedPrediction(Guid RequestId, DateTimeOffset CreatedAt, string Error);
 
 internal static class PredictionJson
 {
