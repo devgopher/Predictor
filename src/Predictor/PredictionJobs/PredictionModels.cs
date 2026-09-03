@@ -2,11 +2,15 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace Predictor.Predictions;
+namespace Predictor.PredictionJobs;
 
-public sealed record PredictionJob(Guid RequestId, string Text);
+public sealed record PredictionJob(Guid RequestId, string Text, string? Question = null);
 
-public sealed record PredictionResult(Guid RequestId, DateTimeOffset CreatedAt, string Text);
+public sealed record PredictionResult(
+    Guid RequestId,
+    DateTimeOffset CreatedAt,
+    string Text,
+    string Thinking = "");
 
 public sealed record FailedPrediction(Guid RequestId, DateTimeOffset CreatedAt, string Error);
 

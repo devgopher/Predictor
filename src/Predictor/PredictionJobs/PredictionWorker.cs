@@ -1,6 +1,6 @@
 using Predictor.Ollama;
 
-namespace Predictor.Predictions;
+namespace Predictor.PredictionJobs;
 
 internal sealed class PredictionWorker : BackgroundService
 {
@@ -30,8 +30,12 @@ internal sealed class PredictionWorker : BackgroundService
             try
             {
                 _logger.LogInformation("Prediction {RequestId} started", job.RequestId);
-                var text = await _ollama.WriteConclusionsAsync(job.Text, token: stoppingToken);
-                var result = new PredictionResult(job.RequestId, DateTimeOffset.UtcNow, text);
+                var chat = await _ollama.WriteConclusionsAsync(job.Text, job.Question, stoppingToken);
+                var result = new PredictionResult(
+                    job.RequestId,
+                    DateTimeOffset.UtcNow,
+                    chat.Content,
+                    chat.Thinking);
                 await _store.SaveCompletedAsync(result, stoppingToken);
                 _logger.LogInformation("Prediction {RequestId} completed", job.RequestId);
             }

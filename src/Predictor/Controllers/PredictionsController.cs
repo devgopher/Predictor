@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Predictor.Models;
-using Predictor.Predictions;
+using Predictor.PredictionJobs;
 
 namespace Predictor.Controllers;
 

@@ -1,4 +1,4 @@
-namespace Predictor.Predictions;
+namespace Predictor.PredictionJobs;
 
 public sealed class PredictionOptions
 {

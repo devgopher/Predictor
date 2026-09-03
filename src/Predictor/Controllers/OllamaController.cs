@@ -31,7 +31,7 @@ public sealed class OllamaController(IOllamaClient ollama) : ControllerBase
             : $"Today {DateTime.UtcNow.Date} UTC. {request.SystemPrompt}";
 
         var reply = await ollama.ChatAsync(request.Message, systemPrompt, token);
-        return Ok(new { reply });
+        return Ok(new { reply = reply.Content, thinking = reply.Thinking });
     }
 
     [HttpPost("conclusions")]
@@ -41,6 +41,6 @@ public sealed class OllamaController(IOllamaClient ollama) : ControllerBase
             return BadRequest(new { error = "context is required" });
 
         var conclusions = await ollama.WriteConclusionsAsync(request.Context, request.Question, token);
-        return Ok(new { conclusions });
+        return Ok(new { conclusions = conclusions.Content, thinking = conclusions.Thinking });
     }
 }

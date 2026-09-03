@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 
-namespace Predictor.Predictions;
+namespace Predictor.PredictionJobs;
 
 public sealed class PredictionStore
 {
@@ -27,6 +27,8 @@ public sealed class PredictionStore
     }
 
     public string RootPath => _root;
+
+    public string GetCompletedPath(Guid requestId) => CompletedPath(requestId);
 
     public bool ExistsCompleted(Guid requestId) => File.Exists(CompletedPath(requestId));
 
@@ -81,7 +83,7 @@ public sealed class PredictionStore
 
     private static async Task WriteAtomicallyAsync<T>(string dest, T value, CancellationToken token)
     {
-        var temp = dest + ".tmp";
+        var temp = $"{dest}.tmp";
         var json = JsonSerializer.Serialize(value, PredictionJson.Options);
         try
         {

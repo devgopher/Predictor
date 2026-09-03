@@ -145,25 +145,24 @@ public sealed class UrlContentFetcher(IHttpClientFactory httpClientFactory, ILog
         if (ip.AddressFamily == AddressFamily.InterNetworkV6)
         {
             var bytes = ip.GetAddressBytes();
-            if ((bytes[0] & 0xFE) == 0xFC)
-                return true;
-            return false;
+            return (bytes[0] & 0xFE) == 0xFC;
         }
 
         if (ip.AddressFamily != AddressFamily.InterNetwork)
             return true;
 
         var b = ip.GetAddressBytes();
-        if (b[0] == 0 || b[0] == 10 || b[0] == 127)
-            return true;
-        if (b[0] == 169 && b[1] == 254)
-            return true;
-        if (b[0] == 172 && b[1] >= 16 && b[1] <= 31)
-            return true;
-        if (b[0] == 192 && b[1] == 168)
-            return true;
+        
+        switch (b[0])
+        {
+            case 0:
+            case 10:
+            case 127:
+            case 169 when b[1] == 254:
+                return true;
+        }
 
-        return false;
+        return b[0] == 172 && b[1] >= 16 && b[1] <= 31 || b[0] == 192 && b[1] == 168;
     }
 
     private static async Task<string> ReadLimitedTextAsync(

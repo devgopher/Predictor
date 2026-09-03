@@ -30,6 +30,10 @@ public class OllamaClient(
         @"<think>[\s\S]*?</think>",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    private static readonly Regex ThinkBlockCapture = new(
+        @"<think>([\s\S]*?)</think>",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     private static readonly object[] FetchUrlTools =
     [
         new
@@ -81,7 +85,7 @@ public class OllamaClient(
         return modern?.Embeddings?.FirstOrDefault();
     }
 
-    public async Task<string> ChatAsync(string userPrompt, string? systemPrompt = null, CancellationToken token = default)
+    public async Task<OllamaChatResult> ChatAsync(string userPrompt, string? systemPrompt = null, CancellationToken token = default)
     {
         var agent = _options.Chat;
         var system = string.IsNullOrWhiteSpace(systemPrompt)
@@ -96,7 +100,7 @@ public class OllamaClient(
         return await CompleteChatAsync(agent, messages, token);
     }
 
-    public Task<string> WriteConclusionsAsync(string context, string? question = null, CancellationToken token = default)
+    public Task<OllamaChatResult> WriteConclusionsAsync(string context, string? question = null, CancellationToken token = default)
     {
         var userPrompt = string.IsNullOrWhiteSpace(question)
             ? $"Напиши выводы по следующим данным:\n\n{context}"
@@ -105,7 +109,7 @@ public class OllamaClient(
         return ChatAsync(userPrompt, _options.Chat.SystemPrompt, token);
     }
 
-    private async Task<string> CompleteChatAsync(
+    private async Task<OllamaChatResult> CompleteChatAsync(
         OllamaAgentOptions agent,
         List<object> messages,
         CancellationToken token)
@@ -115,6 +119,7 @@ public class OllamaClient(
         var client = CreateOllamaClient();
         var chatUrl = ApiUrl(agent, "api/chat");
         var includeThink = true;
+        var thinkingParts = new List<string>();
 
         for (var round = 0; round < MaxToolRounds; round++)
         {
@@ -124,6 +129,8 @@ public class OllamaClient(
                 includeThink = false;
             using var doc = JsonDocument.Parse(raw);
             var message = doc.RootElement.GetProperty("message");
+            AppendThinking(thinkingParts, message);
+
             if (agent.AllowUrlFetch && TryGetToolCalls(message, out var toolCalls))
             {
                 messages.Add(JsonSerializer.Deserialize<JsonElement>(message.GetRawText()));
@@ -145,7 +152,9 @@ public class OllamaClient(
             var content = message.TryGetProperty("content", out var contentEl)
                 ? contentEl.GetString() ?? string.Empty
                 : string.Empty;
-            return StripThink(content);
+            return new OllamaChatResult(
+                StripThink(content),
+                string.Join("\n\n", thinkingParts.Where(static t => !string.IsNullOrWhiteSpace(t))));
         }
 
         throw new InvalidOperationException("Ollama chat exceeded the tool-call round limit.");
@@ -168,7 +177,7 @@ public class OllamaClient(
             ["messages"] = messages
         };
         if (includeThink)
-            payload["think"] = false;
+            payload["think"] = true;
         if (agent.AllowUrlFetch)
             payload["tools"] = FetchUrlTools;
         return payload;
@@ -200,7 +209,7 @@ public class OllamaClient(
                 if (ShouldOmitThink(response.StatusCode, raw) && payload.Remove("think"))
                 {
                     logger.LogWarning(
-                        "Ollama rejected think=false at {BaseUrl}; retrying without the think field.",
+                        "Ollama rejected think=true at {BaseUrl}; retrying without the think field.",
                         agent.ResolvedBaseUrl);
                     attempt--;
                     continue;
@@ -503,6 +512,30 @@ public class OllamaClient(
             return parsed;
 
         return null;
+    }
+
+    private static void AppendThinking(List<string> thinkingParts, JsonElement message)
+    {
+        if (message.TryGetProperty("thinking", out var thinkingEl) &&
+            thinkingEl.ValueKind == JsonValueKind.String)
+        {
+            var field = thinkingEl.GetString();
+            if (!string.IsNullOrWhiteSpace(field))
+            {
+                thinkingParts.Add(field.Trim());
+                return;
+            }
+        }
+
+        var content = message.TryGetProperty("content", out var contentEl)
+            ? contentEl.GetString() ?? string.Empty
+            : string.Empty;
+        foreach (Match match in ThinkBlockCapture.Matches(content))
+        {
+            var block = match.Groups[1].Value.Trim();
+            if (!string.IsNullOrWhiteSpace(block))
+                thinkingParts.Add(block);
+        }
     }
 
     private static string StripThink(string content)

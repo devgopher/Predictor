@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using System.Threading.Channels;
 
-namespace Predictor.Predictions;
+namespace Predictor.PredictionJobs;
 
 public sealed class PredictionQueue
 {
