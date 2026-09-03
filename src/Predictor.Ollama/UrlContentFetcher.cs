@@ -10,7 +10,7 @@ public sealed class UrlContentFetcher(IHttpClientFactory httpClientFactory, ILog
 {
     public const string HttpClientName = "OllamaUrlFetch";
     public const string ToolName = "fetch_url";
-    private const int DefaultMaxBytes = 65536;
+    private const int DefaultMaxBytes = 1048576;
     private const int DefaultTimeoutSeconds = 15;
     private const int MaxRedirects = 5;
 
