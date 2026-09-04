@@ -8,6 +8,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<ProjectReference Include="..\..\external\botticelli\Botticelli.Framework\Botticelli.Framework.csproj" />
 		<ProjectReference Include="..\NewsBot.Logic\NewsBot.Logic.csproj" />
 	</ItemGroup>
 
