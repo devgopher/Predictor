@@ -1,0 +1,34 @@
+﻿@page "/logoff"
+@inject NavigationManager UriHelper;
+@inject CookieStorageAccessor Cookies;
+
+@code
+
+{
+    private string _message = string.Empty;
+}
+
+<PageTitle>Logoff</PageTitle>
+
+<RadzenCard class="rz-my-auto rz-mx-auto rz-p-auto rz-p-md-auto" style="max-width: 160px">
+    <RadzenStack Orientation="Orientation.Vertical">
+        <RadzenImage Path="new_logo_m.png" Style="width: 128px; height: 128px" />
+    </RadzenStack>
+</RadzenCard>
+<RadzenCard class="rz-my-12 rz-mx-auto rz-p-4 rz-p-md-12" style="max-width: 600px;">
+    <RadzenStack Orientation="Orientation.Vertical" Gap="5px">
+        <RadzenLabel @bind-text="@_message" Style="color: green; font-weight: bold"/>
+        <RadzenButton Text="Logoff" Click="async e => await DoLogoff(e)"/>
+
+        @code
+
+        {
+            public async Task DoLogoff(MouseEventArgs args)
+            {
+                await Cookies.SetValueAsync("SessionToken", string.Empty);
+                UriHelper.NavigateTo("/");
+            }
+        }
+
+    </RadzenStack>
+</RadzenCard>

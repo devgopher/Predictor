@@ -1,0 +1,105 @@
+:root {
+  color-scheme: light dark;
+  --bg: #0f1419;
+  --panel: #1a2332;
+  --text: #e7ecf3;
+  --muted: #9fb0c3;
+  --accent: #4da3ff;
+  --border: #2d3a4d;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: Segoe UI, system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.layout {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px;
+  display: grid;
+  gap: 16px;
+}
+
+header h1 { margin: 0 0 4px; }
+header p { margin: 0; color: var(--muted); }
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+input, textarea, button {
+  font: inherit;
+}
+
+input, textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #101722;
+  color: var(--text);
+}
+
+.command-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.command-chip {
+  border: 1px solid var(--border);
+  background: #101722;
+  color: var(--text);
+  border-radius: 999px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.command-chip:hover { border-color: var(--accent); }
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+button {
+  border: none;
+  border-radius: 8px;
+  padding: 10px 16px;
+  background: var(--accent);
+  color: #041018;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+button.secondary {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+#output {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  min-height: 180px;
+  font-family: Consolas, monospace;
+  font-size: 13px;
+}
+
+.error { color: #ff8b8b; }

@@ -1,0 +1,152 @@
+﻿@page "/your_bots"
+@using System.Net.Http.Headers
+@using Botticelli.Server.Data.Entities.Bot
+@using Botticelli.Server.FrontNew.Settings
+@using Botticelli.Shared.API.Admin.Responses
+@using Botticelli.Shared.Constants
+@using Flurl
+@using Microsoft.Extensions.Options
+@inject NavigationManager UriHelper;
+@inject IOptionsMonitor<BackSettings> BackSettings;
+@inject CookieStorageAccessor Cookies;
+@inject IJSRuntime JsRuntime;
+
+<PageTitle>Your bots</PageTitle>
+<h1>Bot list</h1>
+
+@if (_bots == null)
+{
+    <p>
+        <em>Loading...</em>
+    </p>
+}
+else
+{
+    <RadzenStack Orientation="Orientation.Vertical" JustifyContent="JustifyContent.Center" Gap="20px">
+
+        @foreach (var botGroup in _bots.Chunk(5))
+        {
+            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.Center" Gap="40px">
+                @foreach (var bot in botGroup)
+                {
+                    <RadzenCard Style="@(GetStyle(bot))">
+                        <RadzenStack Gap="5px" JustifyContent="JustifyContent.Center">
+                            <RadzenImage Path="@GetLogo(bot.Type)"
+                                         Style="align-content: center; height: 100px; width: 100px;"/>
+                        </RadzenStack>
+                        <RadzenStack Gap="10px">
+                            <RadzenText TextStyle="TextStyle.Overline" Text="@bot.BotName"/>
+                            <RadzenText TextStyle="TextStyle.Body2" Text="@GetIsAlive(bot.LastKeepAlive)"/>
+                            <RadzenText TextStyle="TextStyle.Body2" Text="@GetIsActive(bot.Status)"/>
+                            <RadzenButton Click="@(e => SendStartStop(bot.BotId, bot.Status))" Text="Lock/Unlock"/>
+                            <RadzenButton Click="@(e => UriHelper.NavigateTo($"/broadcast/send/{bot.BotId}", true))"
+                                          ButtonStyle="ButtonStyle.Primary"
+                                          Style="width: 100%"
+                                          Text="Send broadcast message"/>
+                            <RadzenButton Click="@(e => UriHelper.NavigateTo($"/update_bot/{bot.BotId}", true))"
+                                          ButtonStyle="ButtonStyle.Primary"
+                                          Style="width: 100%"
+                                          Text="Update"/>
+                            <RadzenButton Click="@(e => UriHelper.NavigateTo($"/bot_metrics/{bot.BotId}", true))"
+                                          ButtonStyle="ButtonStyle.Primary"
+                                          Style="width: 100%"
+                                          Text="See metrics"/>
+                            <RadzenButton Click="@(e => RemoveBot(bot.BotId))" Text="Remove"/>
+                        </RadzenStack>
+                    </RadzenCard>
+                }
+            </RadzenStack>
+        }
+    </RadzenStack>
+
+    <RadzenButton Click="@(e => UriHelper.NavigateTo("/add_bot", true))"
+                  ButtonStyle="ButtonStyle.Primary"
+                  Style="width: 100%"
+                  Text="Add bot"/>
+}
+
+@code {
+
+    private BotInfo[]? _bots;
+    HttpClient? _http;
+
+    protected override bool ShouldRender()
+    {
+        return true;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var sessionToken = await Cookies.GetValueAsync("SessionToken");
+
+        try
+        {
+            _http = HttpClientFactory.Create();
+            _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", sessionToken);
+            _bots = await _http.GetFromJsonAsync<BotInfo?[]>(Url.Combine(BackSettings.CurrentValue.BackUrl, "/admin/GetBots"));
+        }
+        catch (Exception ex)
+        {
+        }
+    }
+
+    private async Task RemoveBot(string botId)
+    {
+        if (!await JsRuntime.InvokeAsync<bool>("confirm", ["Are you sure?"])) return;
+
+        await _http.GetAsync(Url.Combine(BackSettings.CurrentValue.BackUrl, $"/admin/RemoveBot?botId={botId}"));
+        UriHelper.NavigateTo("/your_bots", true);
+    }
+
+    protected async Task SendStartStop(string botId, BotStatus? status)
+    {
+        if (status != BotStatus.Unlocked)
+            await _http.GetAsync(Url.Combine(BackSettings.CurrentValue.BackUrl, $"/admin/ActivateBot?botId={botId}"));
+        else
+            await _http.GetAsync(Url.Combine(BackSettings.CurrentValue.BackUrl, $"/admin/DeactivateBot?botId={botId}"));
+
+        UriHelper.NavigateTo("/your_bots", true);
+    }
+
+    private static string GetIsActive(BotStatus? status)
+    {
+        return status switch
+        {
+            BotStatus.Unlocked => "Unlocked",
+            BotStatus.Locked   => "Locked",
+            _                  => "Unknown"
+        };
+    }
+
+    private static string GetIsAlive(DateTime? lastKeepAlive)
+    {
+        return DateTime.UtcNow - lastKeepAlive <= TimeSpan.FromSeconds(30) ? "Alive" : "Dead";
+    }
+
+
+    private string GetLogo(BotType? type)
+    {
+        return type switch
+        {
+            BotType.Telegram   => "Telegram.png",
+            BotType.WhatsApp   => "Whatsapp.png",
+            BotType.Viber      => "Viber.png",
+            BotType.RocketChat => "RocketChat.png",
+            BotType.Signal     => "Signal.png",
+            BotType.Unknown    => "Unknown.png",
+            _                  => "Unknown.png"
+        };
+    }
+
+
+    private string GetStyle(BotInfo bot)
+    {
+        return bot.Status switch
+        {
+            BotStatus.Unlocked => $"width: 200px; background-color: {(GetIsAlive(bot.LastKeepAlive) == "Alive" ? "greenyellow" : "gainsboro")}",
+            BotStatus.Locked   => "width: 200px; background-color: red",
+            _                  => "width: 200px; background-color: gray"
+        };
+    }
+
+}

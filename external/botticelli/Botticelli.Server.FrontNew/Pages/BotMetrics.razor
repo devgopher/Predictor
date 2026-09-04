@@ -1,0 +1,192 @@
+﻿@page "/bot_metrics/{botId}/{From?}/{To?}"
+@using System.Globalization
+@using System.Net.Http.Headers
+@using Botticelli.Analytics.Shared.Requests
+@using Botticelli.Analytics.Shared.Responses
+@using Botticelli.Server.Data.Entities.Bot
+@using Botticelli.Server.FrontNew.Models
+@using Botticelli.Server.FrontNew.Settings
+@using Botticelli.Server.FrontNew.Utils
+@using Flurl
+@using Microsoft.Extensions.Options
+@inject NavigationManager UriHelper;
+@inject IOptionsMonitor<BackSettings> BackSettings;
+@inject CookieStorageAccessor Cookies;
+
+
+@code {
+    private string _error = string.Empty;
+    private DateTime _from;
+    private DateTime _to;
+    private const string dateFormat = "yyyy-MM-dd HH:mm:ss";
+}
+
+<PageTitle>Bot metrics</PageTitle>
+
+<h1>Bot metrics</h1>
+
+@if (_bot == null)
+{
+    <p>
+        <em>Loading...</em>
+    </p>
+}
+else
+{
+    <RadzenStack Orientation="Orientation.Vertical" JustifyContent="JustifyContent.Center" Gap="20px">
+        @{
+            <RadzenStack Orientation="Orientation.Horizontal">
+                <RadzenLabel Text="From:"/>
+                <RadzenDatePicker Change="async () => await GetMetrics()" @bind-Value=@_from/>
+            </RadzenStack>
+            <RadzenStack Orientation="Orientation.Horizontal">
+                <RadzenLabel Text="To:"/>
+                <RadzenDatePicker Change="async () => await GetMetrics()" @bind-Value=@_to/>
+            </RadzenStack>
+            <RadzenButton Text="Apply" Click="ApplyDates"/>
+
+            foreach (var metricName in _metrics.Keys)
+            {
+                _metrics[metricName] ??= new List<MetricsModel>();
+                <RadzenStack Orientation="Orientation.Vertical" JustifyContent="JustifyContent.Center" Gap="20px">
+                    <RadzenText TextStyle="TextStyle.Overline" Text="@metricName"/>
+                    <RadzenChart>
+                        <RadzenLegend Position="LegendPosition.Left"/>
+                        <RadzenColumnOptions Radius="3" Width="10.0"/>
+                        <RadzenColumnSeries Data="@_metrics[metricName].Select(x => new {DateTime = x.DateTime.ToString("dd.MM.yyyy HH:mm"), x.Value})"
+                                            CategoryProperty="DateTime"
+                                            Title="Count"
+                                            LineType="LineType.Dashed"
+                                            StrokeWidth="0.0"
+                                            ValueProperty="Value">
+                            <RadzenSeriesDataLabels Visible="true"/>
+                        </RadzenColumnSeries>
+                        <RadzenValueAxis>
+                            <RadzenGridLines Visible="true"/>
+                        </RadzenValueAxis>
+                        <RadzenCategoryAxis Step="@TimeSpan.FromHours(1)">
+                            <RadzenGridLines Visible="true"/>
+                        </RadzenCategoryAxis>
+                    </RadzenChart>
+                </RadzenStack>
+            }
+        }
+    </RadzenStack>
+}
+
+@code {
+
+    [Parameter]
+    public string BotId { get; set; }
+
+    [Parameter]
+    public string From { get; set; }
+
+    [Parameter]
+    public string To { get; set; }
+
+    readonly Dictionary<string, IEnumerable<MetricsModel>> _metrics = new();
+
+    private BotInfo _bot;
+
+    protected override bool ShouldRender()
+    {
+        return true;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _from = From?.ToDateTime(dateFormat, CultureInfo.InvariantCulture) ?? DateTime.Now.AddDays(-14);
+        _to = To?.ToDateTime(dateFormat, CultureInfo.InvariantCulture) ?? DateTime.Now;
+        var sessionToken = await Cookies.GetValueAsync("SessionToken");
+
+        try
+        {
+            _bot = await GetBot(sessionToken);
+            await GetMetrics();
+        }
+        catch (Exception ex)
+        {
+            _error = $"token:{sessionToken} ex:{ex.Message} {ex.InnerException?.Message}";
+        }
+    }
+
+    private async Task GetMetrics()
+    {
+        TimeSpan interval;
+        var delta = _to - _from;
+
+        if (delta < TimeSpan.Zero)
+            interval = TimeSpan.FromHours(1);
+        else if (delta <= TimeSpan.FromHours(3))
+            interval = TimeSpan.FromMinutes(10);
+        else if (delta <= TimeSpan.FromHours(12))
+            interval = TimeSpan.FromMinutes(30);
+        else if (delta <= TimeSpan.FromDays(1))
+            interval = TimeSpan.FromHours(1);
+        else if (delta <= TimeSpan.FromDays(7))
+            interval = TimeSpan.FromDays(1);
+        else
+            interval = TimeSpan.FromDays(7);
+
+        var metricNames = await GetMetricNames();
+
+        foreach (var metricName in metricNames)
+        {
+            _error = metricName;
+
+            var request = new GetMetricsForIntervalsRequest
+            {
+                BotId = BotId,
+                From = _from,
+                To = _to + interval,
+                Interval = (int) interval.TotalSeconds,
+                Name = metricName
+            };
+
+            var metrics = await GetBotMetrics(request);
+            _metrics[metricName] = metrics;
+        }
+    }
+
+    private async Task<IEnumerable<MetricsModel>> GetBotMetrics(GetMetricsForIntervalsRequest request)
+    {
+        using var http = HttpClientFactory.Create();
+        var botStatusResponse = await http.GetAsync(Url.Combine(BackSettings.CurrentValue.AnalyticsUrl,
+                                                                "/metrics/getter/GetMetricsForInterval?")
+                                                       .SetQueryParams(request));
+        var metrics = await botStatusResponse.Content.ReadFromJsonAsync<GetMetricsIntervalsResponse>();
+        var output = metrics.MetricsForIntervals.Select(m => new MetricsModel
+        {
+            DateTime = m.From,
+            Value = m.Count
+        });
+
+        return output;
+    }
+
+    private async Task<IEnumerable<string>> GetMetricNames()
+    {
+        using var http = HttpClientFactory.Create();
+        var response = await http.GetAsync(Url.Combine(BackSettings.CurrentValue.AnalyticsUrl, "/metrics/getter/GetMetricNames"));
+        var output = await response.Content.ReadFromJsonAsync<IEnumerable<string>>();
+
+        return output;
+    }
+
+    private async Task<BotInfo> GetBot(string sessionToken)
+    {
+        using var http = HttpClientFactory.Create();
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", sessionToken);
+        var bots = await http.GetFromJsonAsync<BotInfo[]>(Url.Combine(BackSettings.CurrentValue.BackUrl, "/admin/GetBots"));
+        var bot = bots.FirstOrDefault(b => b.BotId == BotId);
+
+        return bot;
+    }
+
+    private void ApplyDates()
+    {
+        UriHelper.NavigateTo($"/bot_metrics/{BotId}/{_from.ToString(dateFormat)}/{_to.ToString(dateFormat)}", true);
+    }
+
+}

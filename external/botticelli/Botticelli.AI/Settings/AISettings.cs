@@ -1,0 +1,10 @@
+﻿namespace Botticelli.AI.Settings;
+
+public class AiSettings : ProviderSettings
+{
+    public string? Url { get; set; }
+    public required string AiName { get; set; }
+    public bool StreamGeneration { get; set; }
+    public string AuthMethod { get; set; } = "Bearer";
+    public string? ApiKey { get; set; }
+}

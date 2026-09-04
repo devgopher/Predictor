@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "Botticelli": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "launchUrl": "swagger",
+      "applicationUrl": "http://0.0.0.0:5251",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "AnalyticsSettings__ConnectionString": "Server=127.0.0.1;Port=5432;Database=botticelli_analytics;Userid=postgres;Password=12345678;Pooling=true;ConnectionLifeTime=15;"
+      }
+    }
+  }
+}

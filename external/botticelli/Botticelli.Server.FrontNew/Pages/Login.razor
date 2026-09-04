@@ -1,0 +1,101 @@
+﻿@page "/"
+@using Botticelli.Server.FrontNew.Clients
+@using Botticelli.Server.FrontNew.Models
+@inject SessionClient SessionClient;
+@inject NavigationManager UriHelper;
+@inject CookieStorageAccessor Cookies;
+
+@code
+
+{
+    private bool _hasAnyUsers;
+
+    private readonly Error _error = new()
+    {
+        UserMessage = string.Empty
+    };
+
+    /// <summary>
+    ///     Method invoked when the component is ready to start, having received its
+    ///     initial parameters from its parent in the render tree.
+    ///     Override this method if you will perform an asynchronous operation and
+    ///     want the component to refresh when that operation is completed.
+    /// </summary>
+    /// <returns>A <see cref="T:System.Threading.Tasks.Task" /> representing any asynchronous operation.</returns>
+    protected override async Task OnInitializedAsync()
+    {
+        _hasAnyUsers = await SessionClient.HasUsersAsync();
+
+        if (!_hasAnyUsers) UriHelper.NavigateTo("/register", true);
+    }
+}
+
+<PageTitle>Login</PageTitle>
+
+<RadzenCard class="rz-my-auto rz-mx-auto rz-p-auto rz-p-md-auto" style="max-width: 160px">
+    <RadzenStack Orientation="Orientation.Vertical">
+        <RadzenImage Path="new_logo_m.png" Style="width: 128px; height: 128px" />
+    </RadzenStack>
+</RadzenCard>
+<RadzenCard class="rz-my-12 rz-mx-auto rz-p-4 rz-p-md-12" style="max-width: 600px;">
+    <RadzenStack Orientation="Orientation.Vertical" Gap="5px">
+        <RadzenTemplateForm Data=@("SimpleLogin")>
+            <RadzenLogin Login="async e => await DoLogin(e)"
+                         ResetPassword="async e => await DoReset(e)"
+                         AllowRegister="false"
+                         AllowResetPassword="true"/>
+        </RadzenTemplateForm>
+        <RadzenLabel Text="@_error.UserMessage" Style="color: red; font-weight: bold; border: none"/>
+
+        @code
+
+        {
+            public async Task DoLogin(LoginArgs args)
+            {
+                await Cookies.SetValueAsync("SessionToken", string.Empty);
+                var sessionToken = await Cookies.GetValueAsync("SessionToken");
+
+                if (string.IsNullOrWhiteSpace(sessionToken))
+                {
+                    var result = await SessionClient.CreateSession(args.Username, args.Password);
+
+                    if (result.error != null && result.error.UserMessage.ToLowerInvariant() != "success")
+                    {
+                        await Cookies.SetValueAsync("SessionToken", string.Empty);
+                        _error.UserMessage = result.error.UserMessage;
+                    }
+                    else
+                    {
+                        sessionToken = result.session.Token;
+                        await Cookies.SetValueAsync("SessionToken", sessionToken + ";SameSite=None;Secure=True");
+                        UriHelper.NavigateTo("/your_bots", true);
+                        #if DEBUG
+                        _error.UserMessage = await Cookies.GetValueAsync("SessionToken");
+                        #endif
+                    }
+                }
+                else
+                {
+                    await Cookies.SetValueAsync("SessionToken", sessionToken + ";SameSite=None;Secure=True");
+                    _error.UserMessage = sessionToken;
+                    UriHelper.NavigateTo("/logoff", true);
+                }
+            }
+
+            public async Task DoReset(string userName)
+            {
+                var result = await SessionClient.ResetPassword(userName);
+
+                if (result.UserMessage.ToLowerInvariant() != "success")
+                {
+                    _error.UserMessage = result.UserMessage;
+                }
+                else
+                {
+                    _error.UserMessage = "Check your email";
+                }
+            }
+        }
+
+    </RadzenStack>
+</RadzenCard>

@@ -1,0 +1,146 @@
+﻿using Botticelli.BotData.Entities.Bot;
+using Botticelli.Framework.Exceptions;
+using Botticelli.Framework.Options;
+using Botticelli.Interfaces;
+using Botticelli.Shared.API.Admin.Requests;
+using Botticelli.Shared.API.Admin.Responses;
+using Botticelli.Shared.API.Client.Requests;
+using Botticelli.Shared.API.Client.Responses;
+using Microsoft.Extensions.Logging;
+using Polly;
+
+namespace Botticelli.Framework.Services;
+
+public class BotStatusService(
+        IHttpClientFactory httpClientFactory,
+        ServerSettings serverSettings,
+        IBot bot,
+        ILogger<BotStatusService> logger)
+        : BotActualizationService(httpClientFactory,
+                                  bot,
+                                  logger,
+                                  serverSettings)
+{
+    private const short GetStatusPeriod = 10;
+    private const short MaxGetStatusPeriod = 120;
+    private Task? _getRequiredStatusEventTask;
+
+    public override Task StartAsync(CancellationToken cancellationToken)
+    {
+        GetRequiredStatus(cancellationToken);
+
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    ///     Get the required status for a bot from server
+    /// </summary>
+    /// <param name="cancellationToken"></param>
+    /// <exception cref="ArgumentOutOfRangeException"></exception>
+    /// <exception cref="BotException"></exception>
+    private void GetRequiredStatus(CancellationToken cancellationToken)
+    {
+        if (_getRequiredStatusEventTask != null) return;
+
+        ActualizationEvent.Set();
+        var request = new GetRequiredStatusFromServerRequest
+        {
+            BotId = BotId
+        };
+
+        _getRequiredStatusEventTask = Policy.HandleResult<GetRequiredStatusFromServerResponse>(_ => true)
+            .WaitAndRetryForeverAsync((_, ctx) => !ctx.TryGetValue("delay", out var delay) ? TimeSpan.FromSeconds(GetStatusPeriod) : (TimeSpan)delay, (result, i, timeSpan, context) =>
+            {
+                var gotRetries = context.TryGetValue("gotRetries", out var gr) ? (int)gr + 1 : 0;
+                var delay = GetDelay(gotRetries);
+
+                context["gotRetries"] = result.Result.Status == BotStatus.Error ? gotRetries : 0;
+                context["delay"] = result.Result.Status == BotStatus.Error ?
+                        TimeSpan.FromSeconds(delay > MaxGetStatusPeriod ? MaxGetStatusPeriod : delay) :
+                        TimeSpan.FromSeconds(GetStatusPeriod);
+            })
+            .ExecuteAndCaptureAsync(ct => Process(request, ct)!, cancellationToken);
+    }
+
+    private static double GetDelay(int i) => GetStatusPeriod + GetStatusPeriod * Math.Log(i + 1, Math.E);
+
+    private Task<GetRequiredStatusFromServerResponse?> Process(GetRequiredStatusFromServerRequest request,
+                                                               CancellationToken cancellationToken)
+    {
+        var task = InnerSendPost<GetRequiredStatusFromServerRequest, GetRequiredStatusFromServerResponse>(request,
+                                                                                                          "/bot/client/GetRequiredBotStatus",
+                                                                                                          cancellationToken);
+
+        task.Wait(cancellationToken);
+
+        var taskResult = task.Result;
+
+        if (taskResult == null)
+        {
+            logger.LogError("No result from server!");
+            
+            return Task.FromResult<GetRequiredStatusFromServerResponse?>(new GetRequiredStatusFromServerResponse
+            {
+                Status = BotStatus.Error,
+                BotId = BotId ?? string.Empty,
+                BotContext = null
+            });
+        }
+
+        var botContext = taskResult.BotContext;
+
+        if (botContext == null)
+        {
+            logger.LogError("No bot context from server!");
+            
+            return Task.FromResult<GetRequiredStatusFromServerResponse?>(new GetRequiredStatusFromServerResponse
+            {
+                Status = BotStatus.Error,
+                BotId = BotId ?? string.Empty,
+                BotContext = null
+            });
+        }
+
+        var botData = new BotData.Entities.Bot.BotData
+        {
+            BotId = botContext.BotId,
+            Status = task.Result?.Status,
+            BotKey = botContext.BotKey,
+            AdditionalInfo = botContext.Items?.Select(it => new BotAdditionalInfo
+                                       {
+                                           BotId = taskResult.BotId,
+                                           ItemName = it.Key,
+                                           ItemValue = it.Value
+                                       })
+                                       .ToList()
+        };
+
+        Bot.SetBotContext(botData, cancellationToken);
+
+        if (task.Exception != null)
+        {
+            Logger.LogError("GetRequiredStatus task error: {Message}", task.Exception?.Message);
+            Bot.StopBotAsync(StopBotRequest.GetInstance(), cancellationToken);
+
+            return task;
+        }
+
+        switch (task.Result?.Status)
+        {
+            case BotStatus.Unlocked:
+                Bot.StartBotAsync(StartBotRequest.GetInstance(), cancellationToken);
+
+                break;
+            case BotStatus.Locked:
+            case BotStatus.Unknown:
+            case BotStatus.Error:
+            case null:
+                Bot.StopBotAsync(StopBotRequest.GetInstance(), cancellationToken);
+
+                break;
+            default: throw new ArgumentOutOfRangeException();
+        }
+
+        return task;
+    }
+}

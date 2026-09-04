@@ -1,0 +1,27 @@
+﻿{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "TelegramAiChatGptSample": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "launchUrl": "",
+      "applicationUrl": "http://localhost:5074",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "SampleSettings__SecureStorageConnectionString": "Filename=database.db;Password=123;Connection=Shared",
+        "GptSettings__AiName": "gpt",
+        "GptSettings__ApiKey": "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",
+        "GptSettings__GenerateTokensLimit": "800",
+        "GptSettings__TopP": "0.45",
+        "GptSettings__TopK": "0",
+        "GptSettings__Temperature": "0.8",
+        "GptSettings__Url": "https://api.openai.com/v1/",
+        "GptSettings__Model": "gpt-3.5-turbo",
+        "GptSettings__StreamGeneration": "true",
+        "ServerSettings__ServerUri": "http://113.30.189.83:5042/v1/",
+        "AnalyticsSettings__ServerUri": "http://113.30.189.83:5251/v1/"
+      }
+    }
+  }
+}

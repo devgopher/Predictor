@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NewsBot Test Console</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="layout">
+    <header>
+      <h1>NewsBot Test Console</h1>
+      <p>Тест команд без Telegram</p>
+    </header>
+
+    <section class="panel settings">
+      <label>
+        API URL
+        <input id="apiUrl" type="url" value="http://localhost:5280">
+      </label>
+      <label>
+        User ID
+        <input id="userId" type="number" value="1001" min="1">
+      </label>
+    </section>
+
+    <section class="panel commands">
+      <h2>Команды</h2>
+      <div id="commandList" class="command-list"></div>
+    </section>
+
+    <section class="panel input-panel">
+      <label>
+        Текст команды
+        <textarea id="commandText" rows="3" placeholder="/news"></textarea>
+      </label>
+      <div class="actions">
+        <button id="sendBtn" type="button">Отправить</button>
+        <button id="clearBtn" type="button" class="secondary">Очистить ответ</button>
+      </div>
+    </section>
+
+    <section class="panel output">
+      <h2>Ответ бота</h2>
+      <pre id="output">Готов к тесту.</pre>
+    </section>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

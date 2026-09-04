@@ -1,0 +1,127 @@
+﻿@page "/update_bot/{botId}"
+@using System.Net.Http.Headers
+@using Botticelli.Server.Data.Entities.Bot
+@using Botticelli.Server.FrontNew.Models
+@using Botticelli.Server.FrontNew.Settings
+@using Botticelli.Shared.API.Client.Requests
+@using Botticelli.Shared.API.Client.Responses
+@using Flurl
+@using Microsoft.Extensions.Options
+@inject HttpClient Http
+@inject NavigationManager UriHelper;
+@inject IOptionsMonitor<BackSettings> BackSettings;
+@inject CookieStorageAccessor Cookies;
+
+<RadzenTemplateForm TItem="BotModel" Data="@_model" Submit="@OnSubmit">
+    <ChildContent>
+        <div style="margin-bottom: 1rem;" class="row">
+            <div class="col-md-3">
+                <RadzenLabel Text="Bot id:" Component="BotId" style="width: 100%;"/>
+            </div>
+            <div class="col-md-9">
+                <RadzenTextBox MaxLength="255" style="display: block; width: 100%;" @bind-Value="@_model.BotId"
+                               Name="BotId"/>
+                <RadzenRequiredValidator Component="BotId" Text="Bot id shouldn't be empty!"
+                                         style="position: absolute;"/>
+            </div>
+        </div>
+        <div style="margin-bottom: 1rem;" class="row">
+            <div class="col-md-3">
+                <RadzenLabel Text="Bot key:" Component="BotKey" style="width: 100%;"/>
+            </div>
+            <div class="col-md-9">
+                <RadzenTextBox MaxLength="255" style="display: block; width: 100%;" @bind-Value="@_model.BotKey"
+                               Name="BotKey"/>
+                <RadzenRequiredValidator Component="BotKey" Text="Bot key shouldn't be empty!"
+                                         style="position: absolute;"/>
+            </div>
+        </div>
+        <div style="margin-bottom: 1rem;" class="row">
+            <div class="col-md-3">
+                <RadzenLabel Text="Bot name:" Component="BotName" style="width: 100%;">
+                </RadzenLabel>
+            </div>
+            <div class="col-md-9">
+                <RadzenTextBox MaxLength="255" style="display: block; width: 100%;" @bind-Value="@_model.BotName"
+                               Name="BotName"/>
+                <RadzenRequiredValidator Component="BotName" Text="Bot name shouldn't be empty!"
+                                         style="position: absolute;"/>
+            </div>
+        </div>
+        <div style="margin-bottom: 1rem;" class="row">
+            <RadzenButton ButtonType="ButtonType.Submit" Text="Save"/>
+        </div>
+    </ChildContent>
+</RadzenTemplateForm>
+
+@code {
+
+    [Parameter]
+    public string BotId { get; set; }
+
+    readonly BotModel _model = new();
+
+    protected override bool ShouldRender()
+    {
+        return true;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var sessionToken = await Cookies.GetValueAsync("SessionToken");
+        var bot = await GetBot(sessionToken);
+
+        var botStatus = await GetBotStatus(sessionToken);
+
+        _model.BotId = BotId;
+        _model.BotName = bot.BotName;
+        _model.BotKey = botStatus.BotContext.BotKey;
+    }
+
+    private async Task<GetRequiredStatusFromServerResponse?> GetBotStatus(string sessionToken)
+    {
+        using var http = HttpClientFactory.Create();
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", sessionToken);
+
+        var botStatusResponse = await http.PostAsJsonAsync(Url.Combine(BackSettings.CurrentValue.BackUrl, "/bot/client/GetRequiredBotStatus"),
+                                                           new GetRequiredStatusFromServerRequest
+                                                           {
+                                                               BotId = BotId
+                                                           });
+
+        return await botStatusResponse.Content.ReadFromJsonAsync<GetRequiredStatusFromServerResponse>();
+    }
+
+    private async Task<BotInfo?> GetBot(string sessionToken)
+    {
+        using var http = HttpClientFactory.Create();
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", sessionToken);
+        var bots = await http.GetFromJsonAsync<BotInfo[]>(Url.Combine(BackSettings.CurrentValue.BackUrl, "/admin/GetBots"));
+        var bot = bots?.FirstOrDefault(b => b.BotId == BotId);
+
+        return bot;
+    }
+
+    private async Task OnSubmit(BotModel model)
+    {
+        var request = new UpdateBotRequest
+        {
+            BotId = model.BotId,
+            BotKey = model.BotKey,
+            BotName = model.BotName
+        };
+
+        var sessionToken = await Cookies.GetValueAsync("SessionToken");
+
+        if (string.IsNullOrWhiteSpace(sessionToken)) return;
+
+        Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", sessionToken);
+        var response = await Http.PutAsJsonAsync(Url.Combine(BackSettings.CurrentValue.BackUrl, "/admin/UpdateBot"),
+                                                 request);
+
+        var updateBotResponse = await response.Content.ReadFromJsonAsync<UpdateBotResponse>();
+
+        UriHelper.NavigateTo("/your_bots", true);
+    }
+
+}

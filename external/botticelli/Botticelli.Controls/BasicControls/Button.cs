@@ -1,0 +1,30 @@
+﻿namespace Botticelli.Controls.BasicControls;
+
+public class Button : IControl
+{
+    public Button()
+    {
+    }
+
+    public Button(string? content)
+    {
+        Content = content;
+    }
+
+    public string? Image { get; set; }
+    public string? Content { get; set; }
+
+    public Dictionary<string, string>? Params { get; set; } = new();
+
+    public Dictionary<string, Dictionary<string, object>>? MessengerSpecificParams { get; set; } = new();
+
+    public string? CallbackData
+    {
+        get => Params?["CallbackData"];
+        set
+        {
+            Params ??= new Dictionary<string, string>();
+            if (value != null) Params["CallbackData"] = value;
+        }
+    }
+}
